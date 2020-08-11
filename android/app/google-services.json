@@ -1,0 +1,40 @@
+{
+  "project_info": {
+    "project_number": "1013338580818",
+    "firebase_url": "https://ssdam-4174b.firebaseio.com",
+    "project_id": "ssdam-4174b",
+    "storage_bucket": "ssdam-4174b.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1013338580818:android:b865818028fd0f2f487c8b",
+        "android_client_info": {
+          "package_name": "com.example.ssdam"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1013338580818-t7grt165pl0qcsv0gippaog9dkp9298f.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC22QPzLwtP8y2bmxnw38u8oUON9D_kKw0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1013338580818-t7grt165pl0qcsv0gippaog9dkp9298f.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

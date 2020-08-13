@@ -35,7 +35,6 @@ class IntroPage extends StatelessWidget {
         width: 285.0,
         alignment: Alignment.center,
       ),
-
       titleTextStyle: TextStyle(fontFamily: 'MyFont', color: Colors.white),
       bodyTextStyle: TextStyle(fontFamily: 'MyFont', color: Colors.white),
     ),
@@ -69,8 +68,8 @@ class IntroPage extends StatelessWidget {
       home: Builder(
         builder: (context) => IntroViewsFlutter(
           pages,
-          showNextButton: true,
-          showBackButton: true,
+          showNextButton: false,
+          showBackButton: false,
           onTapDoneButton: () {
             Navigator.push(
               context,

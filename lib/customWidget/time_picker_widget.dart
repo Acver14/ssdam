@@ -1,309 +1,448 @@
+library time_picker_spinner;
+
 import 'package:flutter/material.dart';
+import 'dart:math';
 
-import 'package:ssdam/customClass/time_picker_format_constant.dart';
-import 'package:simpletime_picker/scrollable_time_picker.dart';
+class ItemScrollPhysics extends ScrollPhysics {
+  /// Creates physics for snapping to item.
+  /// Based on PageScrollPhysics
+  final double itemHeight;
+  final double targetPixelsLimit;
 
-enum TimePickType { hour, hourMinute, hourMinuteSecond }
+  const ItemScrollPhysics({
+    ScrollPhysics parent,
+    this.itemHeight,
+    this.targetPixelsLimit = 3.0,
+  })  : assert(itemHeight != null && itemHeight > 0),
+        super(parent: parent);
 
-enum DisplayType { dialog, bottomSheet }
-
-class TimePicker {
-  static Future<DateTime> pickTime(BuildContext context,
-      {Color selectedColor = Colors.amber,
-        Color nonSelectedColor = Colors.black,
-        double fontSize = 24,
-        TimePickType timePickType = TimePickType.hourMinuteSecond,
-        bool isTwelveHourFormat = false,
-        String buttonName = "Submit",
-        String title,
-        TextStyle buttonTextStyle,
-        TextStyle titleTextStyle,
-        Color buttonBackgroundColor,
-        DisplayType displayType = DisplayType.bottomSheet}) async {
-    assert(fontSize > 0 && fontSize <= 30);
-    if (buttonTextStyle != null) assert(buttonTextStyle.fontSize > 0 && buttonTextStyle.fontSize <= 30);
-    if (titleTextStyle != null) assert(titleTextStyle.fontSize > 0 && titleTextStyle.fontSize <= 30);
-    var result;
-
-    DisplayType displays = displayType ?? DisplayType.bottomSheet;
-    if (displays == DisplayType.dialog) {
-      result = await showDialog(
-          context: context,
-          builder: (context) {
-            return Dialog(
-                child: Container(
-                  child: TimePickerPage(
-                    selectedColor: selectedColor,
-                    nonSelectedColor: nonSelectedColor,
-                    fontSize: fontSize,
-                    timePickType: timePickType,
-                    buttonName: buttonName,
-                    title: title,
-                    titleTextStyle: titleTextStyle,
-                    buttonBackgroundColor: buttonBackgroundColor,
-                    buttonTextStyle: buttonTextStyle,
-                    isTwelveHourFormat: isTwelveHourFormat,
-                  ),
-                ));
-          });
-    } else if (displays == DisplayType.bottomSheet) {
-      result = await showModalBottomSheet(
-          context: context,
-          builder: (context) {
-            return TimePickerPage(
-              selectedColor: selectedColor,
-              nonSelectedColor: nonSelectedColor,
-              fontSize: fontSize,
-              timePickType: timePickType,
-              title: title,
-              titleTextStyle: titleTextStyle,
-              buttonName: buttonName,
-              buttonBackgroundColor: buttonBackgroundColor,
-              buttonTextStyle: buttonTextStyle,
-              isTwelveHourFormat: isTwelveHourFormat,
-            );
-          });
-    }
-
-    return result;
+  @override
+  ItemScrollPhysics applyTo(ScrollPhysics ancestor) {
+    return ItemScrollPhysics(
+        parent: buildParent(ancestor), itemHeight: itemHeight);
   }
+
+  double _getItem(ScrollPosition position) {
+    double maxScrollItem =
+        (position.maxScrollExtent / itemHeight).floorToDouble();
+    return min(max(0, position.pixels / itemHeight), maxScrollItem);
+  }
+
+  double _getPixels(ScrollPosition position, double item) {
+    return item * itemHeight;
+  }
+
+  double _getTargetPixels(
+      ScrollPosition position, Tolerance tolerance, double velocity) {
+    double item = _getItem(position);
+    if (velocity < -tolerance.velocity)
+      item -= targetPixelsLimit;
+    else if (velocity > tolerance.velocity) item += targetPixelsLimit;
+    return _getPixels(position, item.roundToDouble());
+  }
+
+  @override
+  Simulation createBallisticSimulation(
+      ScrollMetrics position, double velocity) {
+    // If we're out of range and not headed back in range, defer to the parent
+    // ballistics, which should put us back in range at a item boundary.
+//    if ((velocity <= 0.0 && position.pixels <= position.minScrollExtent) ||
+//        (velocity >= 0.0 && position.pixels >= position.maxScrollExtent))
+//      return super.createBallisticSimulation(position, velocity);
+    Tolerance tolerance = this.tolerance;
+    final double target = _getTargetPixels(position, tolerance, velocity);
+    if (target != position.pixels)
+      return ScrollSpringSimulation(spring, position.pixels, target, velocity,
+          tolerance: tolerance);
+    return null;
+  }
+
+  @override
+  bool get allowImplicitScrolling => false;
 }
 
-class TimePickerPage extends StatefulWidget {
-  final Color selectedColor;
-  final Color nonSelectedColor;
-  final double fontSize;
-  final TimePickType timePickType;
-  final bool isTwelveHourFormat;
-  final String buttonName;
-  final String title;
-  final TextStyle titleTextStyle;
-  final TextStyle buttonTextStyle;
-  final Color buttonBackgroundColor;
+typedef SelectedIndexCallback = void Function(int);
+typedef TimePickerCallback = void Function(DateTime);
 
-  const TimePickerPage(
+class TimePickerSpinner extends StatefulWidget {
+  final DateTime time;
+  final int minutesInterval;
+  final int secondsInterval;
+  final bool is24HourMode;
+  final bool isShowSeconds;
+  final TextStyle highlightedTextStyle;
+  final TextStyle normalTextStyle;
+  final double itemHeight;
+  final double itemWidth;
+  final AlignmentGeometry alignment;
+  final double spacing;
+  final bool isForce2Digits;
+  final TimePickerCallback onTimeChange;
+
+  TimePickerSpinner(
       {Key key,
-        this.selectedColor,
-        this.nonSelectedColor,
-        this.fontSize,
-        this.timePickType,
-        this.isTwelveHourFormat,
-        this.buttonName,
-        this.buttonTextStyle,
-        this.buttonBackgroundColor,
-        this.title,
-        this.titleTextStyle})
+      this.time,
+      this.minutesInterval = 1,
+      this.secondsInterval = 1,
+      this.is24HourMode = true,
+      this.isShowSeconds = false,
+      this.highlightedTextStyle,
+      this.normalTextStyle,
+      this.itemHeight,
+      this.itemWidth,
+      this.alignment,
+      this.spacing,
+      this.isForce2Digits = false,
+      this.onTimeChange})
       : super(key: key);
 
   @override
-  _TimePickerPageState createState() => _TimePickerPageState();
+  _TimePickerSpinnerState createState() => new _TimePickerSpinnerState();
 }
 
-class _TimePickerPageState extends State<TimePickerPage> {
-  FixedExtentScrollController _hourController = FixedExtentScrollController();
-  FixedExtentScrollController _minuteController = FixedExtentScrollController();
-  FixedExtentScrollController _secondController = FixedExtentScrollController();
-  int _hour;
-  int _minute = 0;
-  int _second = 0;
-  String ampm;
-  DateTime _now = DateTime.now();
-  DateTime _result;
+class _TimePickerSpinnerState extends State<TimePickerSpinner> {
+  ScrollController hourController = new ScrollController();
+  ScrollController minuteController = new ScrollController();
+  ScrollController secondController = new ScrollController();
+  ScrollController apController = new ScrollController();
+  int currentSelectedHourIndex = -1;
+  int currentSelectedMinuteIndex = -1;
+  int currentSelectedSecondIndex = -1;
+  int currentSelectedAPIndex = -1;
+  DateTime currentTime;
+  bool isHourScrolling = false;
+  bool isMinuteScrolling = false;
+  bool isSecondsScrolling = false;
+  bool isAPScrolling = false;
+
+  /// default settings
+  TextStyle defaultHighlightTextStyle =
+      new TextStyle(fontSize: 32, color: Colors.black);
+  TextStyle defaultNormalTextStyle =
+      new TextStyle(fontSize: 32, color: Colors.black54);
+  double defaultItemHeight = 60;
+  double defaultItemWidth = 45;
+  double defaultSpacing = 20;
+  AlignmentGeometry defaultAlignment = Alignment.centerRight;
+
+  /// getter
+
+  TextStyle _getHighlightedTextStyle() {
+    return widget.highlightedTextStyle != null
+        ? widget.highlightedTextStyle
+        : defaultHighlightTextStyle;
+  }
+
+  TextStyle _getNormalTextStyle() {
+    return widget.normalTextStyle != null
+        ? widget.normalTextStyle
+        : defaultNormalTextStyle;
+  }
+
+  int _getHourCount() {
+    return widget.is24HourMode ? 24 : 12;
+  }
+
+  int _getMinuteCount() {
+    return (60 / widget.minutesInterval).floor();
+  }
+
+  int _getSecondCount() {
+    return (60 / widget.secondsInterval).floor();
+  }
+
+  double _getItemHeight() {
+    return widget.itemHeight != null ? widget.itemHeight : defaultItemHeight;
+  }
+
+  double _getItemWidth() {
+    return widget.itemWidth != null ? widget.itemWidth : defaultItemWidth;
+  }
+
+  double _getSpacing() {
+    return widget.spacing != null ? widget.spacing : defaultSpacing;
+  }
+
+  AlignmentGeometry _getAlignment() {
+    return widget.alignment != null ? widget.alignment : defaultAlignment;
+  }
+
+  bool isLoop(int value) {
+    return value > 10;
+  }
+
+  DateTime getDateTime() {
+    int hour = currentSelectedHourIndex - _getHourCount();
+    if (!widget.is24HourMode && currentSelectedAPIndex == 2) hour += 12;
+    int minute = (currentSelectedMinuteIndex -
+            (isLoop(_getMinuteCount()) ? _getMinuteCount() : 1)) *
+        widget.minutesInterval;
+    int second = (currentSelectedSecondIndex -
+            (isLoop(_getSecondCount()) ? _getSecondCount() : 1)) *
+        widget.secondsInterval;
+    return DateTime(currentTime.year, currentTime.month, currentTime.day, hour,
+        minute, second);
+  }
 
   @override
   void initState() {
-    if (widget.isTwelveHourFormat) ampm = "AM";
-    _hour = widget.isTwelveHourFormat ? Constant.twelveHourFormat[0] : Constant.twentyFourHourFormat[0];
-    _result = DateTime(_now.year, _now.month, _now.day, _hour, _minute, _second);
+    currentTime = widget.time == null ? DateTime.now() : widget.time;
+
+    currentSelectedHourIndex =
+        (currentTime.hour % (widget.is24HourMode ? 24 : 12)) + _getHourCount();
+    hourController = new ScrollController(
+        initialScrollOffset: (currentSelectedHourIndex - 1) * _getItemHeight());
+
+    currentSelectedMinuteIndex =
+        (currentTime.minute / widget.minutesInterval).floor() +
+            (isLoop(_getMinuteCount()) ? _getMinuteCount() : 1);
+    minuteController = new ScrollController(
+        initialScrollOffset:
+            (currentSelectedMinuteIndex - 1) * _getItemHeight());
+    print(currentSelectedMinuteIndex);
+    print((currentSelectedMinuteIndex - 1) * _getItemHeight());
+
+    currentSelectedSecondIndex =
+        (currentTime.second / widget.secondsInterval).floor() +
+            (isLoop(_getSecondCount()) ? _getSecondCount() : 1);
+    secondController = new ScrollController(
+        initialScrollOffset:
+            (currentSelectedSecondIndex - 1) * _getItemHeight());
+
+    currentSelectedAPIndex = currentTime.hour >= 12 ? 2 : 1;
+    apController = new ScrollController(
+        initialScrollOffset: (currentSelectedAPIndex - 1) * _getItemHeight());
+
     super.initState();
+
+    if (widget.onTimeChange != null) {
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => widget.onTimeChange(getDateTime()));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    Widget timePickerWidget;
-    if (widget.timePickType == TimePickType.hour) {
-      timePickerWidget = _hourWidget();
-    } else if (widget.timePickType == TimePickType.hourMinute) {
-      timePickerWidget = _hourMinutesWidget();
-    } else if (widget.timePickType == TimePickType.hourMinuteSecond) {
-      timePickerWidget = _hourMinuteSecondWidget();
+    // print(minuteController.offset);
+    List<Widget> contents = [
+      new SizedBox(
+        width: _getItemWidth(),
+        height: _getItemHeight() * 3,
+        child: spinner(
+          hourController,
+          _getHourCount(),
+          currentSelectedHourIndex,
+          isHourScrolling,
+          1,
+          (index) {
+            currentSelectedHourIndex = index + 9;
+            isHourScrolling = true;
+          },
+          () => isHourScrolling = false,
+        ),
+      ),
+      spacer(),
+      new SizedBox(
+        width: _getItemWidth(),
+        height: _getItemHeight() * 3,
+        child: spinner(
+          minuteController,
+          _getMinuteCount(),
+          currentSelectedMinuteIndex,
+          isMinuteScrolling,
+          widget.minutesInterval,
+          (index) {
+            currentSelectedMinuteIndex = index;
+            isMinuteScrolling = true;
+          },
+          () => isMinuteScrolling = false,
+        ),
+      ),
+    ];
+
+    if (widget.isShowSeconds) {
+      contents.add(spacer());
+      contents.add(new SizedBox(
+        width: _getItemWidth(),
+        height: _getItemHeight() * 3,
+        child: spinner(
+          secondController,
+          _getSecondCount(),
+          currentSelectedSecondIndex,
+          isSecondsScrolling,
+          widget.secondsInterval,
+          (index) {
+            currentSelectedSecondIndex = index;
+            isSecondsScrolling = true;
+          },
+          () => isSecondsScrolling = false,
+        ),
+      ));
     }
 
-    return Container(
-      padding: EdgeInsets.all(16.0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              Expanded(
-                  child: Text(widget.title ?? "Title",
-                      style: widget.titleTextStyle == null
-                          ? TextStyle(fontSize: 24, fontWeight: FontWeight.w400)
-                          : widget.titleTextStyle)),
-              InkWell(
-                child: Icon(Icons.close,
-                    size: widget.titleTextStyle?.fontSize ?? 30, color: widget.titleTextStyle?.color ?? Colors.black),
-                onTap: () {
-                  Navigator.pop(context);
-                },
-              )
-            ],
-          ),
-          timePickerWidget,
-          FlatButton(
-              padding: EdgeInsets.all(8.0),
-              onPressed: () {
-                _setResult();
-                Navigator.pop(context, _result);
-              },
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              child: Container(
-                  child: Text(widget.buttonName,
-                      style: widget.buttonTextStyle ?? TextStyle(color: widget.nonSelectedColor)),
-                  alignment: Alignment.center,
-                  width: double.infinity),
-              color: widget.buttonBackgroundColor ?? widget.selectedColor)
-        ],
+    if (!widget.is24HourMode) {
+      contents.add(spacer());
+      contents.add(new SizedBox(
+        width: _getItemWidth() * 1.2,
+        height: _getItemHeight() * 3,
+        child: apSpinner(),
+      ));
+    }
+
+    return new Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: contents,
+    );
+  }
+
+  Widget spacer() {
+    return new Container(
+      width: _getSpacing(),
+      height: _getItemHeight() * 3,
+    );
+  }
+
+  Widget spinner(
+      ScrollController controller,
+      int max,
+      int selectedIndex,
+      bool isScrolling,
+      int interval,
+      SelectedIndexCallback onUpdateSelectedIndex,
+      VoidCallback onScrollEnd) {
+    /// wrapping the spinner with stack and add container above it when it's scrolling
+    /// this thing is to prevent an error causing by some weird stuff like this
+    /// flutter: Another exception was thrown: 'package:flutter/src/widgets/scrollable.dart': Failed assertion: line 469 pos 12: '_hold == null || _drag == null': is not true.
+    /// maybe later we can find out why this error is happening
+
+    Widget _spinner = NotificationListener<ScrollNotification>(
+      onNotification: (scrollNotification) {
+        if (scrollNotification is UserScrollNotification) {
+          if (scrollNotification.direction.toString() ==
+              "ScrollDirection.idle") {
+            if (isLoop(max)) {
+              int segment = (selectedIndex / max).floor();
+              if (segment == 0) {
+                onUpdateSelectedIndex(selectedIndex + max);
+                controller.jumpTo(controller.offset + (max * _getItemHeight()));
+              } else if (segment == 2) {
+                onUpdateSelectedIndex(selectedIndex - max);
+                controller.jumpTo(controller.offset - (max * _getItemHeight()));
+              }
+            }
+            setState(() {
+              onScrollEnd();
+              if (widget.onTimeChange != null) {
+                widget.onTimeChange(getDateTime());
+              }
+            });
+          }
+        } else if (scrollNotification is ScrollUpdateNotification) {
+          setState(() {
+            onUpdateSelectedIndex(
+                (controller.offset / _getItemHeight()).round() + 1);
+          });
+        }
+        return true;
+      },
+      child: new ListView.builder(
+        itemBuilder: (context, index) {
+          String text = '';
+          if (isLoop(max)) {
+            text = ((index % max) * interval).toString();
+          } else if (index != 0 && index != max + 1) {
+            text = (((index - 1) % max) * interval).toString();
+          }
+          if (!widget.is24HourMode &&
+              controller == hourController &&
+              text == '0') {
+            text = '12';
+          }
+          if (widget.isForce2Digits && text != '') {
+            text = text.padLeft(2, '0');
+          }
+          return new Container(
+            height: _getItemHeight(),
+            alignment: _getAlignment(),
+            child: new Text(
+              text,
+              style: selectedIndex == index
+                  ? _getHighlightedTextStyle()
+                  : _getNormalTextStyle(),
+            ),
+          );
+        },
+        controller: controller,
+        itemCount: isLoop(max) ? max * 3 : max + 2,
+        physics: ItemScrollPhysics(itemHeight: _getItemHeight()),
+        padding: EdgeInsets.zero,
       ),
     );
-    ;
-  }
 
-  Widget _hourWidget() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return new Stack(
       children: <Widget>[
-        ScrollableTimePicker(
-            controller: _hourController,
-            selectedColor: widget.selectedColor,
-            nonSelectedColor: widget.nonSelectedColor,
-            fontSize: widget.fontSize,
-            callback: (result) {
-              _hour = result;
-            },
-            dataList: widget.isTwelveHourFormat ? Constant.twelveHourFormat : Constant.twentyFourHourFormat),
-        widget.isTwelveHourFormat ? _twelveHourFormatButton() : Container()
+        Positioned.fill(child: _spinner),
+        isScrolling
+            ? Positioned.fill(
+                child: new Container(
+                color: Colors.black.withOpacity(0),
+              ))
+            : new Container()
       ],
     );
   }
 
-  Widget _hourMinutesWidget() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: <Widget>[
-        ScrollableTimePicker(
-            controller: _hourController,
-            selectedColor: widget.selectedColor,
-            nonSelectedColor: widget.nonSelectedColor,
-            fontSize: widget.fontSize,
-            callback: (result) {
-              _hour = result;
-            },
-            dataList: widget.isTwelveHourFormat ? Constant.twelveHourFormat : Constant.twentyFourHourFormat),
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 16.0),
-          child: Text(":",
-              style: TextStyle(color: widget.nonSelectedColor, fontSize: widget.fontSize), textAlign: TextAlign.center),
+  Widget apSpinner() {
+    Widget _spinner = NotificationListener<ScrollNotification>(
+      onNotification: (scrollNotification) {
+        if (scrollNotification is UserScrollNotification) {
+          if (scrollNotification.direction.toString() ==
+              "ScrollDirection.idle") {
+            isAPScrolling = false;
+            if (widget.onTimeChange != null) {
+              widget.onTimeChange(getDateTime());
+            }
+          }
+        } else if (scrollNotification is ScrollUpdateNotification) {
+          setState(() {
+            currentSelectedAPIndex =
+                (apController.offset / _getItemHeight()).round() + 1;
+            isAPScrolling = true;
+          });
+        }
+        return true;
+      },
+      child: new ListView.builder(
+        itemBuilder: (context, index) {
+          String text = index == 1 ? 'AM' : (index == 2 ? 'PM' : '');
+          return new Container(
+            height: _getItemHeight(),
+            alignment: Alignment.center,
+            child: new Text(
+              text,
+              style: currentSelectedAPIndex == index
+                  ? _getHighlightedTextStyle()
+                  : _getNormalTextStyle(),
+            ),
+          );
+        },
+        controller: apController,
+        itemCount: 4,
+        physics: ItemScrollPhysics(
+          itemHeight: _getItemHeight(),
+          targetPixelsLimit: 1,
         ),
-        ScrollableTimePicker(
-            controller: _minuteController,
-            selectedColor: widget.selectedColor,
-            nonSelectedColor: widget.nonSelectedColor,
-            fontSize: widget.fontSize,
-            callback: (result) {
-              _minute = result;
-            },
-            dataList: Constant.minuteAndSecondFormat),
-        widget.isTwelveHourFormat ? _twelveHourFormatButton() : Container()
+      ),
+    );
+
+    return new Stack(
+      children: <Widget>[
+        Positioned.fill(child: _spinner),
+        isAPScrolling
+            ? Positioned.fill(child: new Container())
+            : new Container()
       ],
     );
-  }
-
-  Widget _hourMinuteSecondWidget() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: <Widget>[
-        ScrollableTimePicker(
-            controller: _hourController,
-            selectedColor: widget.selectedColor,
-            nonSelectedColor: widget.nonSelectedColor,
-            fontSize: widget.fontSize,
-            callback: (result) {
-              _hour = result;
-            },
-            dataList: widget.isTwelveHourFormat ? Constant.twelveHourFormat : Constant.twentyFourHourFormat),
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 16.0),
-          child: Text(":",
-              style: TextStyle(color: widget.nonSelectedColor, fontSize: widget.fontSize), textAlign: TextAlign.center),
-        ),
-        ScrollableTimePicker(
-            controller: _minuteController,
-            selectedColor: widget.selectedColor,
-            nonSelectedColor: widget.nonSelectedColor,
-            fontSize: widget.fontSize,
-            callback: (result) {
-              _minute = result;
-            },
-            dataList: Constant.minuteAndSecondFormat),
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 16.0),
-          child: Text(":",
-              style: TextStyle(color: widget.nonSelectedColor, fontSize: widget.fontSize), textAlign: TextAlign.center),
-        ),
-        ScrollableTimePicker(
-            controller: _secondController,
-            selectedColor: widget.selectedColor,
-            nonSelectedColor: widget.nonSelectedColor,
-            fontSize: widget.fontSize,
-            callback: (result) {
-              _second = result;
-            },
-            dataList: Constant.minuteAndSecondFormat),
-        widget.isTwelveHourFormat ? _twelveHourFormatButton() : Container()
-      ],
-    );
-  }
-
-  void _setResult() {
-    int day = _now.day;
-    if (widget.isTwelveHourFormat) {
-      _hour = _hour == 12 ? 0 : _hour;
-      if (ampm == "PM") {
-        if (_hour != 0) _hour = _hour + 12;
-        if (_hour == 0) day = _now.day + 1;
-      }
-    }
-    _result = DateTime(_now.year, _now.month, day, _hour, _minute, _second);
-  }
-
-  Widget _twelveHourFormatButton() {
-    return Container(
-        child: Column(
-          children: <Widget>[
-            RawMaterialButton(
-                constraints: BoxConstraints(),
-                onPressed: () {
-                  setState(() {
-                    ampm = "AM";
-                  });
-                },
-                fillColor: ampm == "AM" ? widget.selectedColor : null,
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Text('AM', style: TextStyle(fontSize: widget.fontSize))),
-            RawMaterialButton(
-                constraints: BoxConstraints(),
-                onPressed: () {
-                  setState(() {
-                    ampm = "PM";
-                  });
-                },
-                fillColor: ampm == "PM" ? widget.selectedColor : null,
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Text('PM', style: TextStyle(fontSize: widget.fontSize))),
-          ],
-        ),
-        margin: EdgeInsets.symmetric(horizontal: 16.0));
   }
 }

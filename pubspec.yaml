@@ -27,7 +27,9 @@ dependencies:
   flutter_localizations:
     sdk: flutter
 
-  bootpay_api: ^1.1.12
+  firebase_core: ^0.4.1
+
+  #bootpay_api: ^1.1.12
   iamport_flutter: ^0.9.11
 
   url_launcher:
@@ -37,7 +39,6 @@ dependencies:
   logger: ^0.7.0+2
   path_provider: ^1.6.5
   #json_annotation: ^2.0.0
-  simpletime_picker: ^0.1.0
   flutter_date_pickers: ^0.1.4
   #reservation
   intl: ^0.16.1

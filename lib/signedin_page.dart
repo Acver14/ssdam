@@ -8,7 +8,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:logger/logger.dart';
 import 'package:ssdam/style/customColor.dart';
-import 'file:///D:/AndroidProject/Flutter/ssdam/ssdam/lib/customWidget/reservation_button.dart';
+import 'package:ssdam/customWidget/reservation_button.dart';
 import 'package:kopo/kopo.dart';
 import 'package:popup_box/popup_box.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,9 +21,7 @@ import 'package:carousel_slider/carousel_slider.dart';
 
 SignedInPageState pageState;
 
-final List<String>eventList = [
-  'assets/event/event_demo.png'
-];
+final List<String> eventList = ['assets/event/event_demo.png'];
 
 class SignedInPage extends StatefulWidget {
   @override
@@ -123,77 +121,77 @@ class SignedInPageState extends State<SignedInPage> {
     final double statusBarHeight = MediaQuery.of(context).padding.top;
     vh = MediaQuery.of(context).size.height;
     return Scaffold(
-        resizeToAvoidBottomInset: false,
-        extendBodyBehindAppBar: true,
-        appBar:AppBar(
-            iconTheme: new IconThemeData(color: Colors.black),
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            toolbarOpacity: 1.0,
+      resizeToAvoidBottomInset: false,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        iconTheme: new IconThemeData(color: Colors.black),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        toolbarOpacity: 1.0,
+      ),
+      drawer: sideDrawer(context, fp),
+      body: Column(
+        children: <Widget>[
+          CarouselSlider(
+            options: CarouselOptions(
+              height: 200.0,
+              reverse: true,
+              initialPage: 0,
+              autoPlay: true,
+              autoPlayInterval: Duration(seconds: 3),
+            ),
+            items: eventSliders,
           ),
-
-        drawer: sideDrawer(context, fp),
-        body: Column(
-                children: <Widget>[
-                  //Container(height: 300, color: Colors.grey,),
-                  CarouselSlider(
-                    options: CarouselOptions(
-                        height: 300.0,
-                        reverse: true,
-                        initialPage: 0,
-                        autoPlay: true,
-                      autoPlayInterval: Duration(seconds: 3),
-                    ),
-                    items: eventSliders,
-                  ),
-                  Divider(thickness: 5,),
-                  Container(
-                      margin: const EdgeInsets.only(top: 5, left: 30.0, right: 30.0),
-                      child: Center(
-                        child: Column(children: <Widget>[
-                          Padding(padding: EdgeInsets.only(top: statusBarHeight)),
-                          FutureBuilder(
-                              future: Loading(),
-                              builder:
-                                  (BuildContext context, AsyncSnapshot snapshot) {
-                                log.d(snapshot.data);
-                                if (snapshot.hasData && !snapshot.data.isEmpty) {
-                                  _getTrash = snapshot.data['getTrash?'];
-                                  _points = snapshot.data['points'];
-                                  return widgetContainerForReservation();
-                                } else if (snapshot.hasError) {
-                                  return Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text(
-                                      'Error: ${snapshot.error}',
-                                      style: TextStyle(fontSize: 15),
-                                    ),
-                                  );
-                                } else {
-                                  return widgetLoading();
-                                }
-                              }),
-                          SizedBox(
-                            height: 30,
-                          ),
-                          MaterialButton(
-                            onPressed: reservationBtn,
-                            color: COLOR_SSDAM,
-                            textColor: Colors.white,
-                            minWidth: 270.0,
-                            height: 270.0,
-                            child: Image.asset(
-                              'assets/trash-icon.png',
-                              width: 150.0,
-                              height: 150.0,
+          Divider(
+            thickness: 5,
+          ),
+          Container(
+              margin: const EdgeInsets.only(top: 5, left: 30.0, right: 30.0),
+              child: Center(
+                child: Column(children: <Widget>[
+                  Padding(padding: EdgeInsets.only(top: statusBarHeight)),
+                  FutureBuilder(
+                      future: Loading(),
+                      builder: (BuildContext context, AsyncSnapshot snapshot) {
+                        log.d(snapshot.data);
+                        if (snapshot.hasData && !snapshot.data.isEmpty) {
+                          _getTrash = snapshot.data['getTrash?'];
+                          _points = snapshot.data['points'];
+                          return widgetContainerForReservation();
+                        } else if (snapshot.hasError) {
+                          return Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Text(
+                              'Error: ${snapshot.error}',
+                              style: TextStyle(fontSize: 15),
                             ),
-                            padding: EdgeInsets.all(16),
-                            shape: CircleBorder(),
-                          )
-                        ]),
-                      )
+                          );
+                        } else {
+                          return widgetLoading();
+                        }
+                      }),
+                  SizedBox(
+                    height: 30,
+                  ),
+                  MaterialButton(
+                    onPressed: reservationBtn,
+                    color: COLOR_SSDAM,
+                    textColor: Colors.white,
+                    minWidth: 270.0,
+                    height: 270.0,
+                    child: Image.asset(
+                      'assets/trash-icon.png',
+                      width: 150.0,
+                      height: 150.0,
+                    ),
+                    padding: EdgeInsets.all(16),
+                    shape: CircleBorder(),
                   )
-                ],),);
+                ]),
+              ))
+        ],
+      ),
+    );
   }
 
   Widget widgetContainerForReservation() {
@@ -250,36 +248,33 @@ class SignedInPageState extends State<SignedInPage> {
         ), // input address
         ReservationButton(
             text: DateFormat('yyyy년 MM월 dd일 kk시 mm분').format(
-                reservationInfo.getReservationTime() ?? DateTime.now().add(Duration(minutes: 30))),
+                reservationInfo.getReservationTime() ??
+                    DateTime.now().add(Duration(minutes: 30))),
             onPressed: () {
               showDatePicker(
                       context: context,
-                      initialDate:
-                      reservationInfo.getReservationTime() == null ? DateTime.now() : reservationInfo.getReservationTime(),
+                      initialDate: reservationInfo.getReservationTime() == null
+                          ? DateTime.now()
+                          : reservationInfo.getReservationTime(),
                       firstDate: DateTime.now(),
                       lastDate: DateTime.now().add(Duration(days: 30)))
                   .then((date) {
                 setState(() async {
                   _date_time = date;
                   log.d(_date_time);
-                  var result = await TimePicker.pickTime(context,
-                      selectedColor: Colors.amber,
-                      nonSelectedColor: Colors.black,
-                      displayType: DisplayType.bottomSheet,
-                      timePickType: TimePickType.hourMinute,
-                      buttonBackgroundColor: Colors.green,
-                      title: "언제 가져다 드릴까요?",
-                      fontSize: 24.0,
-                      isTwelveHourFormat: false);
-                  _date_time = _date_time.add(
-                      Duration(hours: result.hour, minutes: result.minute));
-                  setState(() {
-                    reservationInfo.setReservationTime(_date_time);
-                  });
-                  log.d("예약 요청 시각 : ${reservationInfo.getReservationTime()}");
                 });
               });
-              setState((){});
+
+              TimePickerSpinner(
+                  is24HourMode: true,
+                  onTimeChange: (time) {
+                    setState(() {
+                      _date_time = _date_time.add(
+                          Duration(hours: time.hour, minutes: time.minute));
+                    });
+                  });
+              log.d("예약 요청 시각 : ${reservationInfo.getReservationTime()}");
+              setState(() {});
             })
       ],
     );
@@ -305,7 +300,7 @@ class SignedInPageState extends State<SignedInPage> {
             reservationInfo.setApplicationTime(DateTime.now());
             if (fp.getUserInfo()["getTrash?"]) {
               if (_points > 10000) {
-                if(reservationInfo.getAddress().length > 0){
+                if (reservationInfo.getAddress().length > 0) {
                   await reservationInfo.saveReservationInfo("collect");
                   setState(() {
                     _points -= 10000;
@@ -324,11 +319,10 @@ class SignedInPageState extends State<SignedInPage> {
                       ),
                       willDisplayWidget: Center(
                           child: Text(
-                            '${fp.getUser().displayName}님\n${reservationInfo.getReservationTime()}\n 쓰레기통 교체 예약이 완료되었습니다.',
-                            style: TextStyle(fontSize: 16, color: Colors.black),
-                          )));
-                }
-                else{
+                        '${fp.getUser().displayName}님\n${reservationInfo.getReservationTime()}\n 쓰레기통 교체 예약이 완료되었습니다.',
+                        style: TextStyle(fontSize: 16, color: Colors.black),
+                      )));
+                } else {
                   return PopupBox.showPopupBox(
                       context: context,
                       button: MaterialButton(
@@ -339,9 +333,9 @@ class SignedInPageState extends State<SignedInPage> {
                       ),
                       willDisplayWidget: Center(
                           child: Text(
-                            '주소 입력해주세요',
-                            style: TextStyle(fontSize: 16, color: Colors.black),
-                          )));
+                        '주소 입력해주세요',
+                        style: TextStyle(fontSize: 16, color: Colors.black),
+                      )));
                 }
               } else {
                 return PopupBox.showPopupBox(
@@ -378,9 +372,9 @@ class SignedInPageState extends State<SignedInPage> {
                   ),
                   willDisplayWidget: Center(
                       child: Text(
-                        '${fp.getUser().displayName}님\n${reservationInfo.getReservationTime()}\n 쓰레기통 배송 예약이 완료되었습니다.',
-                        style: TextStyle(fontSize: 16, color: Colors.black),
-                      )));
+                    '${fp.getUser().displayName}님\n${reservationInfo.getReservationTime()}\n 쓰레기통 배송 예약이 완료되었습니다.',
+                    style: TextStyle(fontSize: 16, color: Colors.black),
+                  )));
             }
           },
         ),
@@ -397,18 +391,17 @@ class SignedInPageState extends State<SignedInPage> {
         ));
   }
 
-
-
-  final List<Widget> eventSliders = eventList.map((item) => Container(
-    child: Container(
-      margin: EdgeInsets.all(5.0),
-      child: ClipRRect(
-          borderRadius: BorderRadius.all(Radius.circular(5.0)),
-          child: FlatButton(
-            child:Image.asset(item, fit: BoxFit.cover, width: 1000.0),
-            onPressed: (){},
-          )
-      ),
-    ),
-  )).toList();
+  final List<Widget> eventSliders = eventList
+      .map((item) => Container(
+            child: Container(
+              margin: EdgeInsets.all(5.0),
+              child: ClipRRect(
+                  borderRadius: BorderRadius.all(Radius.circular(5.0)),
+                  child: FlatButton(
+                    child: Image.asset(item, fit: BoxFit.cover, width: 1000.0),
+                    onPressed: () {},
+                  )),
+            ),
+          ))
+      .toList();
 }
